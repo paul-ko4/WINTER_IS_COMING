@@ -40,6 +40,16 @@ Use the ❄︎ in the menu bar to pause, pick light, medium, heavy or **Extra He
 
 Every setting lives at the top of `WinterIsComing.swift` (`enum Cfg`): how many flakes fall, how fast they fall, how tall the piles get, how big a snowball can grow… Change a number and run `zsh build.sh` again.
 
+## Tests
+
+On macOS, run the scene regression checks with:
+
+```sh
+zsh tests/run_scene_tests.sh
+```
+
+These include a real Finder full-screen toolbar snapshot, top menu/camera insets, toolbar visibility changes, floating dialogs and normal-window snow behavior.
+
 ## License
 
 [MIT](LICENSE) · Made with 💙 and a little help from Claude

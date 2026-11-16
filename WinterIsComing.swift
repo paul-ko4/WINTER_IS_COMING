@@ -38,9 +38,13 @@ enum Cfg {
     var lastError = ""
 
     init() {
+        #if SNOW_SCENE_TESTS
+        trusted = AXIsProcessTrusted()
+        #else
         // On first run macOS shows a prompt asking you to grant the permission
         let opts = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
         trusted = AXIsProcessTrustedWithOptions(opts)
+        #endif
     }
 
     /// Frame of the Dock icon area (global macOS coordinates, origin top-left); nil if unavailable
@@ -937,7 +941,10 @@ final class SnowScene: SKScene {
                                 rect: CGRect(x: b.minX, y: H - b.maxY, width: b.width, height: b.height)))
             }
         }
-        syncWindows(windows, dt: dt, topInset: NSScreen.screens.first?.safeAreaInsets.top ?? 0)
+        let topInset = NSScreen.screens.first.map {
+            max($0.safeAreaInsets.top, $0.frame.maxY - $0.visibleFrame.maxY)
+        } ?? 0
+        syncWindows(windows, dt: dt, topInset: topInset)
 
         // The Dock rarely changes; checking every 0.5 s is enough
         dockAcc += dt
@@ -964,6 +971,10 @@ final class SnowScene: SKScene {
             if r.minX <= tolerance && r.maxX >= size.width - tolerance &&
                r.minY <= tolerance && r.maxY >= size.height - topInset - tolerance {
                 screenCovered = true
+                // Safari and Finder expose full-screen toolbars as separate windows in front
+                // of the main frame. Like the main frame, these top-edge windows have no
+                // exposed roof. Keep floating dialogs whose top edge is below this band.
+                newOrder.removeAll { $0.rect.maxY >= size.height - topInset - tolerance }
                 break       // Windows behind this one are not visible either.
             }
             newOrder.append(item)
