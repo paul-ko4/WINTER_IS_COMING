@@ -26,7 +26,7 @@ cd WINTER_IS_COMING
 zsh build.sh
 ```
 
-Use the ❄︎ in the menu bar to pause, pick light, medium or heavy snow, toggle **Snow Accumulation**, clear the snow, or quit.
+Use the ❄︎ in the menu bar to pause, pick light, medium, heavy or **Extra Heavy** snow, toggle **Snow Accumulation**, clear the snow, or quit. Extra Heavy targets 1,000 falling flakes, twice as many as Heavy.
 
 **Snow Accumulation** is on by default. Turn it off to immediately clear existing piles, loose clumps and snowballs while flakes keep falling. Turn it back on to let snow build up again. Your choice is remembered when you restart the app.
 

@@ -1231,7 +1231,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let amount = NSMenuItem(title: "Snow Amount", action: nil, keyEquivalent: "")
         let sub = NSMenu()
-        for (title, n) in [("Light", 120), ("Medium", 260), ("Heavy", 500)] {
+        for (title, n) in [("Light", 120), ("Medium", 260), ("Heavy", 500), ("Extra Heavy", 1000)] {
             let it = NSMenuItem(title: title, action: #selector(setAmount(_:)), keyEquivalent: "")
             it.target = self
             it.tag = n
