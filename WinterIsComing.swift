@@ -22,8 +22,8 @@ enum Cfg {
     static let dockPad: CGFloat = 4          // extra width of the Dock pile on each side of the icon area
     static let dockTopOffset: CGFloat = -1   // lower it if the snow floats above the Dock, raise it if it sinks in
     static let fallSpeed: CGFloat = 1.5      // falling speed multiplier (1 = original, bigger = faster)
-    static let flakesInFront = true          // some of the smallest flakes fall in front of windows, so they can reach the Dock
-    static let inFrontFraction: CGFloat = 0.4 // share of the smallest layer that falls in front (0...1)
+    static let flakesInFront = true          // allow foreground flakes to pass windows and reach the Dock
+    static let inFrontFraction: CGFloat = 0.4 // share of eligible flakes that falls in front (0...1)
     static let ballStartRadius: CGFloat = 3  // a new snowball starts this small
     static let ballMaxRadius: CGFloat = 28   // and stops growing at this size
     static let maxBalls = 20                 // oldest resting snowballs are removed beyond this
@@ -220,7 +220,8 @@ let layers: [Layer] = [
     var swayFreq: CGFloat = 1
     var phase: CGFloat = 0
     var windFactor: CGFloat = 1
-    var inFront = false          // true = falls in front of windows (ignores them), lands on Dock / ground
+    var inFront = false          // foreground flakes in the original small-flakes-only mode
+    var foregroundCandidate = false // keeps the foreground chance stable when toggling all flake sizes
     var isClump = false          // true = clump sliding off a surface (affected by gravity)
     var ignoreID = -1            // don't land right back on the surface it came from
     var ignoreUntil: CGFloat = 0
@@ -337,6 +338,7 @@ let layers: [Layer] = [
 
 final class SnowScene: SKScene {
     private(set) var accumulationEnabled = true
+    var allFlakeSizesOverWindows = false
     var flakes: [Flake] = []
     var pool: [Flake] = []
     var piles: [Int: Pile] = [:]                 // window number -> snow on top of it
@@ -430,7 +432,8 @@ final class SnowScene: SKScene {
         let r = CGFloat.random(in: 0...1)
         let li = r < 0.40 ? 0 : (r < 0.68 ? 1 : 2)   // 40% far, 28% middle, 32% near
         let L = layers[li]
-        f.inFront = Cfg.flakesInFront && li == 0 && CGFloat.random(in: 0...1) < Cfg.inFrontFraction
+        f.foregroundCandidate = Cfg.flakesInFront && CGFloat.random(in: 0...1) < Cfg.inFrontFraction
+        f.inFront = li == 0 && f.foregroundCandidate
         f.isClump = false
         f.ignoreID = -1
         f.size = CGFloat.random(in: L.size)
@@ -449,6 +452,7 @@ final class SnowScene: SKScene {
         let f = obtain()
         f.isClump = true
         f.inFront = false
+        f.foregroundCandidate = false
         f.size = rnd(2.5, 5)
         f.vel = vel
         f.ignoreID = sourceID
@@ -1082,6 +1086,7 @@ final class SnowScene: SKScene {
         var i = flakes.count - 1
         while i >= 0 {
             let f = flakes[i]
+            let inFront = f.inFront || (allFlakeSizesOverWindows && !f.isClump && f.foregroundCandidate)
             var p = f.node.position
             let prevY = p.y
 
@@ -1109,7 +1114,7 @@ final class SnowScene: SKScene {
                     }
                 }
                 // Then check window tops, front to back
-                if !gone && !f.inFront { for item in order {
+                if !gone && !inFront { for item in order {
                     guard let pile = piles[item.id] else { continue }
                     if f.isClump && item.id == f.ignoreID && t < f.ignoreUntil { continue }
                     guard let c = pile.col(at: p.x), !pile.occ[c] else { continue }
@@ -1128,7 +1133,7 @@ final class SnowScene: SKScene {
             }
             if !gone {
                 // Flakes that fall "behind" a window disappear
-                if !f.inFront {
+                if !inFront {
                     for item in order where item.rect.contains(p) { gone = true; break }
                 }
                 if p.y < -20 { gone = true }
@@ -1189,6 +1194,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         view.ignoresSiblingOrder = true
         scene = SnowScene(size: screen.frame.size)
         scene.setAccumulationEnabled(UserDefaults.standard.object(forKey: "snowAccumulationEnabled") as? Bool ?? true)
+        scene.allFlakeSizesOverWindows = UserDefaults.standard.bool(forKey: "allFlakeSizesOverWindows")
         scene.scaleMode = .resizeFill
         view.presentScene(scene)
         window.contentView = view
@@ -1242,6 +1248,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         amount.submenu = sub
         menu.addItem(amount)
 
+        let flakeSizes = NSMenuItem(title: "All Flake Sizes over Windows", action: #selector(toggleWindowFlakeSizes(_:)), keyEquivalent: "")
+        flakeSizes.target = self
+        flakeSizes.state = scene.allFlakeSizesOverWindows ? .on : .off
+        menu.addItem(flakeSizes)
+
         let accumulation = NSMenuItem(title: "Snow Accumulation", action: #selector(toggleAccumulation(_:)), keyEquivalent: "")
         accumulation.target = self
         accumulation.state = scene.accumulationEnabled ? .on : .off
@@ -1273,6 +1284,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func clearSnow() { scene.clearAll() }
+
+    @objc func toggleWindowFlakeSizes(_ sender: NSMenuItem) {
+        scene.allFlakeSizesOverWindows.toggle()
+        sender.state = scene.allFlakeSizesOverWindows ? .on : .off
+        UserDefaults.standard.set(scene.allFlakeSizesOverWindows, forKey: "allFlakeSizesOverWindows")
+    }
 
     @objc func toggleAccumulation(_ sender: NSMenuItem) {
         scene.setAccumulationEnabled(!scene.accumulationEnabled)
