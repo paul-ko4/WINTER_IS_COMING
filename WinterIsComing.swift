@@ -919,7 +919,7 @@ final class SnowScene: SKScene {
     // Read all window frames (macOS origin is top-left, SpriteKit is bottom-left, so flip y)
     func pollWindows(dt: CGFloat) {
         let H = size.height
-        var newOrder: [(id: Int, rect: CGRect)] = []
+        var windows: [(id: Int, rect: CGRect)] = []
         if let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] {
             for w in info {
                 guard let layerN = w[kCGWindowLayer as String] as? NSNumber, layerN.intValue == 0,
@@ -929,15 +929,47 @@ final class SnowScene: SKScene {
                       let b = CGRect(dictionaryRepresentation: bd as CFDictionary) else { continue }
                 let alpha = (w[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1
                 if alpha < 0.05 || b.width < 80 || b.height < 40 { continue }
-                newOrder.append((id: numN.intValue,
-                                 rect: CGRect(x: b.minX, y: H - b.maxY, width: b.width, height: b.height)))
+                windows.append((id: numN.intValue,
+                                rect: CGRect(x: b.minX, y: H - b.maxY, width: b.width, height: b.height)))
             }
+        }
+        syncWindows(windows, dt: dt, topInset: NSScreen.screens.first?.safeAreaInsets.top ?? 0)
+
+        // The Dock rarely changes; checking every 0.5 s is enough
+        dockAcc += dt
+        if dockAcc >= 0.5 {
+            dockAcc = 0
+            updateDock()
+        }
+
+        computeOcclusion()
+        for p in piles.values { p.redraw() }
+        dockPile?.redraw()
+        ground?.redraw()
+    }
+
+    func syncWindows(_ windows: [(id: Int, rect: CGRect)], dt: CGFloat, topInset: CGFloat = 0) {
+        var newOrder: [(id: Int, rect: CGRect)] = []
+        var screenCovered = false
+        for item in windows {
+            let r = item.rect
+            // Full-screen apps have no visible roof. Treating them as obstacles repeatedly
+            // recycles flakes at the top edge, making them flash at random horizontal positions.
+            // The top inset also covers full-screen frames below a MacBook's camera housing.
+            let tolerance: CGFloat = 2
+            if r.minX <= tolerance && r.maxX >= size.width - tolerance &&
+               r.minY <= tolerance && r.maxY >= size.height - topInset - tolerance {
+                screenCovered = true
+                break       // Windows behind this one are not visible either.
+            }
+            newOrder.append(item)
         }
 
         // Closed / minimized windows: their snow just falls
         let alive = Set(newOrder.map { $0.id })
         for (id, pile) in piles where !alive.contains(id) {
-            release(pile, vel: .zero, id: id)
+            // Entering full screen must not fling old, now-hidden window piles into view.
+            if !screenCovered { release(pile, vel: .zero, id: id) }
             pile.remove()
             piles[id] = nil
             lastRect[id] = nil
@@ -964,18 +996,6 @@ final class SnowScene: SKScene {
             lastRect[id] = r
         }
         order = newOrder
-
-        // The Dock rarely changes; checking every 0.5 s is enough
-        dockAcc += dt
-        if dockAcc >= 0.5 {
-            dockAcc = 0
-            updateDock()
-        }
-
-        computeOcclusion()
-        for p in piles.values { p.redraw() }
-        dockPile?.redraw()
-        ground?.redraw()
     }
 
     func updateDock() {
