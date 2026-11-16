@@ -10,6 +10,7 @@ Snow falls on your desktop and piles up on your windows and Dock. Roll it into s
 
 - 🌨️ **Cozy snowfall**: three layers of flakes (near, middle and far) drifting in a gentle wind
 - 🏔️ **Snow piles up** on top of your windows, along the Dock and at the bottom of the screen
+- ❄️ **Toggle snow accumulation** to keep the snowfall without snow settling on surfaces
 - 🪟 **Drag a window and *whoosh*!** The snow flies off. The faster you drag, the farther it goes
 - ⚪ **Roll snowballs** just by moving your mouse sideways over the snow (no clicking!). They grow as they roll
 - 🎳 **Snowballs push each other** along, and one that's pushed off the edge falls down
@@ -25,7 +26,9 @@ cd WINTER_IS_COMING
 zsh build.sh
 ```
 
-Use the ❄︎ in the menu bar to pause, pick light, medium or heavy snow, clear the snow, or quit.
+Use the ❄︎ in the menu bar to pause, pick light, medium or heavy snow, toggle **Snow Accumulation**, clear the snow, or quit.
+
+**Snow Accumulation** is on by default. Turn it off to immediately clear existing piles, loose clumps and snowballs while flakes keep falling. Turn it back on to let snow build up again. Your choice is remembered when you restart the app.
 
 - No `swiftc`? Run `xcode-select --install` first.
 - Want snow on the Dock too? Turn on **Terminal** in System Settings → Privacy & Security → Accessibility.

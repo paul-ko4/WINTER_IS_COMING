@@ -336,6 +336,7 @@ let layers: [Layer] = [
 // MARK: - Scene
 
 final class SnowScene: SKScene {
+    private(set) var accumulationEnabled = true
     var flakes: [Flake] = []
     var pool: [Flake] = []
     var piles: [Int: Pile] = [:]                 // window number -> snow on top of it
@@ -393,6 +394,18 @@ final class SnowScene: SKScene {
         ground?.redraw()
         for b in balls { b.node.removeFromParent() }
         balls.removeAll()
+        activeBall = nil
+        dragBall = nil
+        updateMouseCapture()
+    }
+
+    func setAccumulationEnabled(_ enabled: Bool) {
+        accumulationEnabled = enabled
+        if !enabled {
+            clearAll()
+            // Loose clumps belong to the cleared snow, not the ongoing snowfall.
+            for i in flakes.indices.reversed() where flakes[i].isClump { recycle(at: i) }
+        }
     }
 
     // MARK: Flake pool
@@ -683,6 +696,7 @@ final class SnowScene: SKScene {
 
     /// Which snow surface is the mouse hovering over? Dock first, then windows front to back, then the ground.
     func surfaceUnderMouse(_ m: CGPoint) -> Pile? {
+        guard accumulationEnabled else { return nil }
         // Hovering over a snowball counts as hovering over the snow it sits on. Without this, a big ball
         // stops rolling as soon as the cursor rises above the thin snow band, which makes pushing jerky.
         for b in balls where !b.falling && !b.dragging && !b.node.isHidden && b.below == nil {
@@ -1064,7 +1078,7 @@ final class SnowScene: SKScene {
             }
 
             var gone = false
-            if p.y < prevY {
+            if accumulationEnabled && p.y < prevY {
                 // The Dock is always in front of every window, so check it first
                 if let d = dockPile, let c = d.col(at: p.x),
                    !(f.isClump && f.ignoreID == SnowScene.dockID && t < f.ignoreUntil) {
@@ -1154,6 +1168,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         view.preferredFramesPerSecond = 60
         view.ignoresSiblingOrder = true
         scene = SnowScene(size: screen.frame.size)
+        scene.setAccumulationEnabled(UserDefaults.standard.object(forKey: "snowAccumulationEnabled") as? Bool ?? true)
         scene.scaleMode = .resizeFill
         view.presentScene(scene)
         window.contentView = view
@@ -1207,6 +1222,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         amount.submenu = sub
         menu.addItem(amount)
 
+        let accumulation = NSMenuItem(title: "Snow Accumulation", action: #selector(toggleAccumulation(_:)), keyEquivalent: "")
+        accumulation.target = self
+        accumulation.state = scene.accumulationEnabled ? .on : .off
+        menu.addItem(accumulation)
+
         let clear = NSMenuItem(title: "Clear Snow", action: #selector(clearSnow), keyEquivalent: "c")
         clear.target = self
         menu.addItem(clear)
@@ -1233,6 +1253,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func clearSnow() { scene.clearAll() }
+
+    @objc func toggleAccumulation(_ sender: NSMenuItem) {
+        scene.setAccumulationEnabled(!scene.accumulationEnabled)
+        sender.state = scene.accumulationEnabled ? .on : .off
+        UserDefaults.standard.set(scene.accumulationEnabled, forKey: "snowAccumulationEnabled")
+    }
 
     @objc func screensChanged() {
         guard let screen = NSScreen.screens.first else { return }
